@@ -43,13 +43,27 @@
 //   }
 // };
 
+// // Utility function to determine product status based on stock
+// const getProductStatus = (stock, minStock) => {
+//   if (stock <= 0) return "critical";
+//   if (stock <= minStock) return "low stock";
+//   return "instock";
+// };
+
 // // @desc Create a new product
 // // @route POST /products
 // // @access Private (Admin or Manager)
 // const createProduct = async (req, res) => {
 //   try {
-//     const { product, stock, category, price, description, image, status } =
-//       req.body;
+//     const {
+//       product,
+//       stock,
+//       minStock = 5,
+//       category,
+//       price,
+//       description,
+//       image,
+//     } = req.body;
 
 //     if (
 //       !product ||
@@ -64,9 +78,12 @@
 //         .json({ message: "All required fields must be provided" });
 //     }
 
+//     const status = getProductStatus(stock, minStock);
+
 //     const newProduct = await Product.create({
 //       product,
 //       stock,
+//       minStock,
 //       category,
 //       price,
 //       description,
@@ -74,9 +91,10 @@
 //       status,
 //     });
 
-//     res
-//       .status(201)
-//       .json({ message: "Product created successfully", product: newProduct });
+//     res.status(201).json({
+//       message: "Product created successfully",
+//       product: newProduct,
+//     });
 //   } catch (error) {
 //     console.error("Error creating product:", error);
 //     res.status(500).json({ message: "Server error", error: error.message });
@@ -95,13 +113,25 @@
 //       return res.status(400).json({ message: "Invalid product ID" });
 //     }
 
-//     const updatedProduct = await Product.findByIdAndUpdate(id, updates, {
-//       new: true,
-//     });
+//     const existingProduct = await Product.findById(id);
 
-//     if (!updatedProduct) {
+//     if (!existingProduct) {
 //       return res.status(404).json({ message: "Product not found" });
 //     }
+
+//     const updatedData = {
+//       ...updates,
+//       status: getProductStatus(
+//         updates.stock !== undefined ? updates.stock : existingProduct.stock,
+//         updates.minStock !== undefined
+//           ? updates.minStock
+//           : existingProduct.minStock
+//       ),
+//     };
+
+//     const updatedProduct = await Product.findByIdAndUpdate(id, updatedData, {
+//       new: true,
+//     });
 
 //     res.json({
 //       message: "Product updated successfully",
@@ -137,28 +167,62 @@
 //   }
 // };
 
+// // @desc Get products by category
+// // @route GET /products/category/:category
+// // @access Private
+// const getProductsByCategory = async (req, res) => {
+//   try {
+//     const { category } = req.params;
+
+//     if (!category || typeof category !== "string") {
+//       return res.status(400).json({ message: "Invalid category" });
+//     }
+
+//     const products = await Product.find({ category: category.trim() }).lean();
+
+//     if (!products.length) {
+//       return res
+//         .status(404)
+//         .json({ message: "No products found in this category" });
+//     }
+
+//     res.json(products);
+//   } catch (error) {
+//     console.error("Error fetching products by category:", error);
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
+// // Example: GET /api/products/categories
+// const getUniqueCategories = async (req, res) => {
+//   try {
+//     const categories = await Product.distinct("category");
+//     res.status(200).json(categories);
+//   } catch (error) {
+//     res.status(500).json({ message: "Failed to fetch categories" });
+//   }
+// };
+
 // module.exports = {
 //   getAllProducts,
 //   getProductById,
 //   createProduct,
 //   updateProduct,
 //   deleteProduct,
+//   getProductsByCategory,
+//   getUniqueCategories,
 // };
 
 const Product = require("../models/Product");
 const mongoose = require("mongoose");
 
 // @desc Get all products
-// @route GET /products
-// @access Private
 const getAllProducts = async (req, res) => {
   try {
     const products = await Product.find().lean();
-
     if (!products.length) {
       return res.status(404).json({ message: "No products found" });
     }
-
     res.json(products);
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -166,19 +230,15 @@ const getAllProducts = async (req, res) => {
   }
 };
 
-// @desc Get a single product by ID
-// @route GET /products/:id
-// @access Private
+// @desc Get a product by ID
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
     const product = await Product.findById(id).lean();
-
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -190,26 +250,19 @@ const getProductById = async (req, res) => {
   }
 };
 
-// Utility function to determine product status based on stock
-const getProductStatus = (stock, minStock) => {
-  if (stock <= 0) return "critical";
-  if (stock <= minStock) return "low stock";
-  return "instock";
-};
-
 // @desc Create a new product
-// @route POST /products
-// @access Private (Admin or Manager)
 const createProduct = async (req, res) => {
   try {
     const {
       product,
       stock,
       minStock = 5,
+      minOrder = 1,
       category,
       price,
       description,
       image,
+      packages = [],
     } = req.body;
 
     if (
@@ -225,16 +278,38 @@ const createProduct = async (req, res) => {
         .json({ message: "All required fields must be provided" });
     }
 
-    const status = getProductStatus(stock, minStock);
+    if (minOrder < 1) {
+      return res.status(400).json({ message: "minOrder must be at least 1" });
+    }
+
+    if (!Array.isArray(packages)) {
+      return res.status(400).json({ message: "packages must be an array" });
+    }
+
+    for (const pkg of packages) {
+      if (!pkg.name || typeof pkg.name !== "string" || pkg.quantity < 1) {
+        return res.status(400).json({ message: "Invalid package entry" });
+      }
+    }
+
+    const existing = await Product.findOne({ product });
+    if (existing) {
+      return res.status(409).json({ message: "Product name must be unique" });
+    }
+
+    const status =
+      stock <= 0 ? "critical" : stock <= minStock ? "low stock" : "instock";
 
     const newProduct = await Product.create({
       product,
       stock,
       minStock,
+      minOrder,
       category,
       price,
       description,
       image,
+      packages,
       status,
     });
 
@@ -249,8 +324,6 @@ const createProduct = async (req, res) => {
 };
 
 // @desc Update a product
-// @route PATCH /products/:id
-// @access Private (Admin or Manager)
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -261,24 +334,51 @@ const updateProduct = async (req, res) => {
     }
 
     const existingProduct = await Product.findById(id);
-
     if (!existingProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    const updatedData = {
-      ...updates,
-      status: getProductStatus(
-        updates.stock !== undefined ? updates.stock : existingProduct.stock,
-        updates.minStock !== undefined
-          ? updates.minStock
-          : existingProduct.minStock
-      ),
-    };
+    if (updates.product && updates.product !== existingProduct.product) {
+      const duplicate = await Product.findOne({ product: updates.product });
+      if (duplicate) {
+        return res.status(409).json({ message: "Product name must be unique" });
+      }
+    }
 
-    const updatedProduct = await Product.findByIdAndUpdate(id, updatedData, {
-      new: true,
-    });
+    if (updates.minOrder !== undefined && updates.minOrder < 1) {
+      return res.status(400).json({ message: "minOrder must be at least 1" });
+    }
+
+    if (updates.packages !== undefined) {
+      if (!Array.isArray(updates.packages)) {
+        return res.status(400).json({ message: "packages must be an array" });
+      }
+      for (const pkg of updates.packages) {
+        if (!pkg.name || typeof pkg.name !== "string" || pkg.quantity < 1) {
+          return res.status(400).json({ message: "Invalid package entry" });
+        }
+      }
+    }
+
+    const stockVal =
+      updates.stock !== undefined ? updates.stock : existingProduct.stock;
+    const minStockVal =
+      updates.minStock !== undefined
+        ? updates.minStock
+        : existingProduct.minStock;
+
+    const status =
+      stockVal <= 0
+        ? "critical"
+        : stockVal <= minStockVal
+        ? "low stock"
+        : "instock";
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      { ...updates, status },
+      { new: true }
+    );
 
     res.json({
       message: "Product updated successfully",
@@ -291,8 +391,6 @@ const updateProduct = async (req, res) => {
 };
 
 // @desc Delete a product
-// @route DELETE /products/:id
-// @access Private (Admin or Manager)
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -302,7 +400,6 @@ const deleteProduct = async (req, res) => {
     }
 
     const deletedProduct = await Product.findByIdAndDelete(id);
-
     if (!deletedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -315,8 +412,6 @@ const deleteProduct = async (req, res) => {
 };
 
 // @desc Get products by category
-// @route GET /products/category/:category
-// @access Private
 const getProductsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
@@ -340,7 +435,7 @@ const getProductsByCategory = async (req, res) => {
   }
 };
 
-// Example: GET /api/products/categories
+// @desc Get unique product categories
 const getUniqueCategories = async (req, res) => {
   try {
     const categories = await Product.distinct("category");

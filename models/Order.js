@@ -50,6 +50,11 @@ const Order = new mongoose.Schema({
       type: String,
       default: "", // Optional: Validate presence if type is 'delivery'
     },
+    fee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
 
   paymentOnDelivery: {

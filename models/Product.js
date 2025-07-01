@@ -1,12 +1,26 @@
 const mongoose = require("mongoose");
 
+const PackageSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  quantity: {
+    type: Number,
+    required: true,
+  },
+});
+
 const ProductSchema = new mongoose.Schema(
   {
     product: {
       type: String,
       required: true,
       trim: true,
+      unique: true, // 🚨 Enforces uniqueness at the database level
     },
+
     stock: {
       type: Number,
       required: true,
@@ -16,7 +30,13 @@ const ProductSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
-      default: 5, // you can set any default minimum value
+      default: 5,
+    },
+    minOrder: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1,
     },
     category: {
       type: String,
@@ -42,6 +62,10 @@ const ProductSchema = new mongoose.Schema(
       type: String,
       default: "",
       required: true,
+    },
+    packages: {
+      type: [PackageSchema],
+      default: [],
     },
   },
   {

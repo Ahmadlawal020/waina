@@ -37,7 +37,7 @@ const sendTermiiSMS = async (to, message) => {
       "https://api.ng.termii.com/api/sms/send",
       {
         to: to.startsWith("0") ? `234${to.slice(1)}` : to,
-        from: "soroman", // Replace with your approved Termii sender ID
+        from: "Masa Treat", // Replace with your approved Termii sender ID
         sms: message,
         type: "plain",
         channel: "generic",

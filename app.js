@@ -29,6 +29,7 @@ app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/paystack", require("./routes/paystackRoutes"));
+app.use("/api/categories", require("./routes/categoryRoutes"));
 
 // 404 Handler - Catch-all for unmatched routes
 app.all("*", (req, res) => {

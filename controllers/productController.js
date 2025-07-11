@@ -196,6 +196,30 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// // @desc Get products by category
+// const getProductsByCategory = async (req, res) => {
+//   try {
+//     const { category } = req.params;
+
+//     if (!category || typeof category !== "string") {
+//       return res.status(400).json({ message: "Invalid category" });
+//     }
+
+//     const products = await Product.find({ category: category.trim() }).lean();
+
+//     if (!products.length) {
+//       return res
+//         .status(404)
+//         .json({ message: "No products found in this category" });
+//     }
+
+//     res.json(products);
+//   } catch (error) {
+//     console.error("Error fetching products by category:", error);
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
 // @desc Get products by category
 const getProductsByCategory = async (req, res) => {
   try {
@@ -207,13 +231,8 @@ const getProductsByCategory = async (req, res) => {
 
     const products = await Product.find({ category: category.trim() }).lean();
 
-    if (!products.length) {
-      return res
-        .status(404)
-        .json({ message: "No products found in this category" });
-    }
-
-    res.json(products);
+    // ✅ Return 200 with an empty array
+    return res.status(200).json(products);
   } catch (error) {
     console.error("Error fetching products by category:", error);
     res.status(500).json({ message: "Server error", error: error.message });

@@ -298,9 +298,65 @@ const getOrderById = async (req, res) => {
   }
 };
 
-// @desc Update order status
-// @route PATCH /orders/:id
-// @access Private (Admin)
+// // @desc Update order status
+// // @route PATCH /orders/:id
+// // @access Private (Admin)
+// const updateOrderStatus = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status } = req.body;
+
+//     const allowedStatuses = [
+//       "pending",
+//       "preparing",
+//       "ready",
+//       "completed",
+//       "cancelled",
+//     ];
+
+//     if (!allowedStatuses.includes(status)) {
+//       return res.status(400).json({ message: "Invalid order status" });
+//     }
+
+//     const updatedOrder = await Order.findByIdAndUpdate(
+//       id,
+//       { status },
+//       { new: true }
+//     ).lean();
+
+//     if (!updatedOrder) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     // ✅ Send SMS to customer on specific status updates
+//     const notifyStatuses = ["ready", "completed", "cancelled"];
+//     const messageMap = {
+//       ready:
+//         "Hello [Customer Name], your order #[Order Number] from Masa Treat is ready! 🎉 If it's for pickup, kindly stop by to pickup. If it’s for delivery, keep your phone available — it’ll be arriving soon. Thanks for choosing us! ",
+//       completed:
+//         "Hello [Customer Name], your order #[Order Number] has been successfully completed and marked as [Picked Up/Delivered]. We hope you enjoy your treats from Masa Treat. Thanks again and see you soon! ",
+//       cancelled:
+//         "Hello [Customer Name], your order #[Order Number] has unfortunately been cancelled. If this was in error or you have questions, feel free to reach out. We’ll be happy to help and have you back with us soon!",
+//     };
+
+//     if (notifyStatuses.includes(status)) {
+//       const phoneNumber = updatedOrder?.buyer?.phoneNumber;
+//       const smsMessage = messageMap[status];
+
+//       if (phoneNumber && smsMessage) {
+//         await sendTermiiSMS(phoneNumber, smsMessage);
+//       }
+//     }
+
+//     res
+//       .status(200)
+//       .json({ message: "Order status updated", order: updatedOrder });
+//   } catch (error) {
+//     console.error("Error updating order status:", error);
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// };
+
 const updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -328,19 +384,27 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // ✅ Send SMS to customer on specific status updates
+    // ✅ Send SMS on these statuses
     const notifyStatuses = ["ready", "completed", "cancelled"];
-    const messageMap = {
-      ready: "Your order is now ready for pickup or delivery. Thank you!",
-      completed:
-        "Your order has been successfully completed. We appreciate your business!",
-      cancelled:
-        "Unfortunately, your order has been cancelled. Please contact support if you need assistance.",
-    };
 
     if (notifyStatuses.includes(status)) {
-      const phoneNumber = updatedOrder?.buyer?.phoneNumber;
-      const smsMessage = messageMap[status];
+      const { fullName, phoneNumber } = updatedOrder?.buyer || {};
+      const orderNumber = updatedOrder?.orderNumber;
+
+      let smsMessage = "";
+
+      if (status === "ready") {
+        smsMessage = `Hello ${fullName},\nYour order #${orderNumber} from Masa Treat is ready! 🎉\n\nIf it's for pickup, kindly stop by to pick it up.\nIf it’s for delivery, keep your phone available — it’ll be arriving soon.\n\nThanks for choosing us!`;
+      } else if (status === "completed") {
+        const deliveryType =
+          updatedOrder?.delivery?.type === "delivery"
+            ? "delivered"
+            : "picked up";
+
+        smsMessage = `Hello ${fullName},\nYour order #${orderNumber} has been successfully completed and marked as ${deliveryType}.\n\nWe hope you enjoy your treats from Masa Treat.\nThanks again and see you soon!`;
+      } else if (status === "cancelled") {
+        smsMessage = `Hello ${fullName},\nYour order #${orderNumber} has unfortunately been cancelled.\n\nIf this was in error or you have questions, feel free to reach out.\nWe’ll be happy to help and have you back with us soon!`;
+      }
 
       if (phoneNumber && smsMessage) {
         await sendTermiiSMS(phoneNumber, smsMessage);

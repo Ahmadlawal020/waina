@@ -26,7 +26,6 @@
 
 // module.exports = sendTermiiSMS;
 
-
 const axios = require("axios");
 
 const sendTermiiSMS = async (to, message) => {
@@ -35,10 +34,10 @@ const sendTermiiSMS = async (to, message) => {
       "https://api.ng.termii.com/api/sms/send",
       {
         to: to.startsWith("0") ? `234${to.slice(1)}` : to,
-        from: "N-Alert", // Termii's approved DND sender ID
+        from: "Masa Treat", // Must be approved by Termii
         sms: message,
         type: "plain",
-        channel: "dnd", // Use DND route
+        channel: "dnd", // Changed from "generic" to "dnd"
         api_key: process.env.TERMII_API_KEY,
       }
     );
@@ -54,4 +53,5 @@ const sendTermiiSMS = async (to, message) => {
 };
 
 module.exports = sendTermiiSMS;
+
 
